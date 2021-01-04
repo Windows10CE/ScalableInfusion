@@ -33,8 +33,8 @@ namespace ScalableInfusion
         public void Awake()
         {
             modEnabled = Config.Bind<bool>("ScalableInfusion", nameof(modEnabled), true, "Whether ScalableInfusion is enabled or not.");
-            percentHealth = Config.Bind<float>("ScalableInfusion", nameof(percentHealth), 0.10f, "The max amount of health one stack of infusion can give you (% of base health). 25% = 0.25. Set to 0 for each infusion to never stop giving health.");
-            maxHealth = Config.Bind<float>("ScalableInfusion", nameof(maxHealth), 0.70f, "The max amount of health all of your infusions can give you, regardless of how many stacks you have (% of base health). 80% = 0.80. Set to 0 for there to be no limit on how much health you can get.");
+            percentHealth = Config.Bind<float>("ScalableInfusion", nameof(percentHealth), 0.20f, "The max amount of health one stack of infusion can give you (% of base health). 25% = 0.25. Set to 0 for each infusion to never stop giving health.");
+            maxHealth = Config.Bind<float>("ScalableInfusion", nameof(maxHealth), 0f, "The max amount of health all of your infusions can give you, regardless of how many stacks you have (% of base health). 80% = 0.80. Set to 0 for there to be no limit on how much health you can get.");
             healthPerKill = Config.Bind<int>("ScalableInfusion", nameof(healthPerKill), 1, "How much health each stack of infusion should give you per kill.");
 
             if (!modEnabled.Value)
@@ -58,8 +58,20 @@ namespace ScalableInfusion
             {
                 if (anyErrors)
                 {
+                    Logger.LogError("An error occurred while hooking, unpatching methods...");
                     IL.RoR2.CharacterBody.RecalculateStats -= RecalculateStatsInfusionHook;
                     IL.RoR2.GlobalEventManager.OnCharacterDeath -= OnCharacterDeathInfusionHook;
+                }
+                else
+                {
+                    string langString = $"Increases health by <style=cIsHealing>{healthPerKill.Value}</style> per <style=cDeath>enemy death</style>";
+                    if (percentHealth.Value > 0)
+                        langString += $" up to <style=cUserSetting>{percentHealth.Value * 100}% <style=cStack>(+{percentHealth.Value * 100}% per stack)</style></style> of your base health.";
+                    else
+                        langString += ".";
+                    if (maxHealth.Value > 0)
+                        langString += $" Caps at <style=cUserSetting>{maxHealth.Value * 100}%</style> of your base health.";
+                    LanguageAPI.Add("ITEM_INFUSION_PICKUP", langString);
                 }
             }
         }
