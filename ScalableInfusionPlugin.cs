@@ -20,7 +20,7 @@ namespace ScalableInfusion
     {
         public const string ModGuid = "com.Windows10CE.ScalableInfusion";
         public const string ModName = "ScalableInfusion";
-        public const string ModVer = "1.0.0";
+        public const string ModVer = "1.0.1";
 
         internal static ConfigEntry<bool> modEnabled;
         internal static ConfigEntry<float> percentHealth;
@@ -64,7 +64,7 @@ namespace ScalableInfusion
                 }
                 else
                 {
-                    string langString = $"Increases health by <style=cIsHealing>{healthPerKill.Value}</style> per <style=cDeath>enemy death</style>";
+                    string langString = $"Increases health by <style=cIsHealing>{healthPerKill.Value} <style=cStack>(+{healthPerKill.Value} per stack)</style></style> per <style=cDeath>enemy death</style>";
                     if (percentHealth.Value > 0)
                         langString += $" up to <style=cUserSetting>{percentHealth.Value * 100}% <style=cStack>(+{percentHealth.Value * 100}% per stack)</style></style> of your base health.";
                     else
