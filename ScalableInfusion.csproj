@@ -45,10 +45,6 @@
       <HintPath>Libs\Mono.Cecil.Rocks.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="Mono.Security">
-      <HintPath>Libs\Mono.Security.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
     <Reference Include="MonoMod.RuntimeDetour">
       <HintPath>Libs\MonoMod.RuntimeDetour.dll</HintPath>
       <Private>false</Private>

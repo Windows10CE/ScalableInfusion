@@ -138,9 +138,9 @@ namespace ScalableInfusion
                 int maxHealth = (int)(baseHealth * ScalableInfusionPlugin.maxHealth.Value);
                 int healthPerKill = ScalableInfusionPlugin.healthPerKill.Value;
                 foreach (int kills in infusionCounts)
-                    total += Math.Min(kills * healthPerKill, percentHealth >= 0 ? percentHealth : float.PositiveInfinity);
+                    total += Math.Min(kills * healthPerKill, percentHealth > 0 ? percentHealth : float.PositiveInfinity);
 
-                return Math.Min(total, maxHealth >= 0 ? maxHealth : float.PositiveInfinity);
+                return Math.Min(total, maxHealth > 0 ? maxHealth : float.PositiveInfinity);
             });
             c.Emit(OpCodes.Add);
             c.Emit(OpCodes.Stloc, baseHealthLoc);
