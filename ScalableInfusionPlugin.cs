@@ -7,7 +7,6 @@ using Mono.Cecil.Cil;
 using R2API;
 using R2API.Utils;
 using RoR2;
-using UnityEngine.Networking;
 
 namespace ScalableInfusion
 {
@@ -27,7 +26,6 @@ namespace ScalableInfusion
         internal static ConfigEntry<float> maxHealth;
         internal static ConfigEntry<int> healthPerKill;
 
-        internal static Dictionary<NetworkInstanceId, List<int>> InfusionCounters;
         private bool anyErrors = false;
 
         public void Awake()
@@ -39,11 +37,6 @@ namespace ScalableInfusion
 
             if (!modEnabled.Value)
                 return;
-            On.RoR2.Run.Start += (orig, self) =>
-            {
-                InfusionCounters = new Dictionary<NetworkInstanceId, List<int>>();
-                orig(self);
-            };
 
             try
             {
@@ -130,14 +123,14 @@ namespace ScalableInfusion
             c.Emit(OpCodes.Ldarg_0);
             c.EmitDelegate<Func<float, CharacterBody, float>>((baseHealth, cb) => 
             {
-                List<int> infusionCounts;
-                if (!ScalableInfusionPlugin.InfusionCounters.TryGetValue(cb.netId, out infusionCounts))
+                var tracker = cb.master.gameObject.GetComponent<InfusionTracker>();
+                if (!tracker)
                     return 0f;
                 float total = 0;
                 int percentHealth = (int)(baseHealth * ScalableInfusionPlugin.percentHealth.Value);
                 int maxHealth = (int)(baseHealth * ScalableInfusionPlugin.maxHealth.Value);
                 int healthPerKill = ScalableInfusionPlugin.healthPerKill.Value;
-                foreach (int kills in infusionCounts)
+                foreach (int kills in tracker.Tracker)
                     total += Math.Min(kills * healthPerKill, percentHealth > 0 ? percentHealth : float.PositiveInfinity);
 
                 return Math.Min(total, maxHealth > 0 ? maxHealth : float.PositiveInfinity);
@@ -197,19 +190,22 @@ namespace ScalableInfusion
             c.Emit(OpCodes.Ldloc, infusionCountLoc);
             c.EmitDelegate<Action<CharacterBody, int>>((cb, infusionCount) =>
             {
-                List<int> infusionCounter = null;
-                if (!ScalableInfusionPlugin.InfusionCounters.TryGetValue(cb.netId, out infusionCounter))
-                    infusionCounter = new List<int>();
+                var tracker = cb.master.gameObject.GetComponent<InfusionTracker>();
+                if (!tracker)
+                    tracker = cb.master.gameObject.AddComponent<InfusionTracker>();
 
                 for (int i = 0; i < infusionCount; i++)
                 {
-                    if (i >= infusionCounter.Count)
-                        infusionCounter.Add(0);
-                    infusionCounter[i] += 1;
+                    if (i >= tracker.Tracker.Count)
+                        tracker.Tracker.Add(0);
+                    tracker.Tracker[i] += 1;
                 }
-
-                ScalableInfusionPlugin.InfusionCounters[cb.netId] = infusionCounter;
             });
         }
+    }
+    
+    public class InfusionTracker : UnityEngine.MonoBehaviour
+    {
+        public List<int> Tracker = new List<int>();
     }
 }
