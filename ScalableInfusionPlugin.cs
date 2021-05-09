@@ -4,32 +4,35 @@ using BepInEx;
 using BepInEx.Configuration;
 using MonoMod.Cil;
 using Mono.Cecil.Cil;
-using R2API;
-using R2API.Utils;
 using RoR2;
+using HarmonyLib;
+using BepInEx.Logging;
 
 namespace ScalableInfusion
 {
     [BepInPlugin(ModGuid, ModName, ModVer)]
-    [NetworkCompatibility(CompatibilityLevel.EveryoneMustHaveMod, VersionStrictness.EveryoneNeedSameModVersion)]
 
-    [BepInDependency(R2API.R2API.PluginGUID, BepInDependency.DependencyFlags.HardDependency)]
-    [R2APISubmoduleDependency(nameof(LanguageAPI))]
+    [BepInDependency(ModCommon.ModCommonPlugin.ModGUID, BepInDependency.DependencyFlags.HardDependency)]
+    [ModCommon.NetworkModlistInclude]
     public class ScalableInfusionPlugin : BaseUnityPlugin
     {
         public const string ModGuid = "com.Windows10CE.ScalableInfusion";
         public const string ModName = "ScalableInfusion";
-        public const string ModVer = "1.0.1";
+        public const string ModVer = "1.1.0";
 
         internal static ConfigEntry<bool> modEnabled;
         internal static ConfigEntry<float> percentHealth;
         internal static ConfigEntry<float> maxHealth;
         internal static ConfigEntry<int> healthPerKill;
 
-        private bool anyErrors = false;
+        internal static Harmony HarmonyInstance = new Harmony(ModGuid);
+
+        new internal static ManualLogSource Logger;
 
         public void Awake()
         {
+            ScalableInfusionPlugin.Logger = base.Logger;
+
             modEnabled = Config.Bind<bool>("ScalableInfusion", nameof(modEnabled), true, "Whether ScalableInfusion is enabled or not.");
             percentHealth = Config.Bind<float>("ScalableInfusion", nameof(percentHealth), 0.20f, "The max amount of health one stack of infusion can give you (% of base health). 25% = 0.25. Set to 0 for each infusion to never stop giving health.");
             maxHealth = Config.Bind<float>("ScalableInfusion", nameof(maxHealth), 0f, "The max amount of health all of your infusions can give you, regardless of how many stacks you have (% of base health). 80% = 0.80. Set to 0 for there to be no limit on how much health you can get.");
@@ -40,64 +43,67 @@ namespace ScalableInfusion
 
             try
             {
-                IL.RoR2.CharacterBody.RecalculateStats += RecalculateStatsInfusionHook;
-                IL.RoR2.GlobalEventManager.OnCharacterDeath += OnCharacterDeathInfusionHook;
+                HarmonyInstance.PatchAll(typeof(Patches));
             }
-            catch
+            catch (Exception e)
             {
-                anyErrors = true;
+                Patches.anyErrors = true;
+                Logger.LogError(e.ToString());
             }
-            finally
-            {
-                if (anyErrors)
-                {
-                    Logger.LogError("An error occurred while hooking, unpatching methods...");
-                    IL.RoR2.CharacterBody.RecalculateStats -= RecalculateStatsInfusionHook;
-                    IL.RoR2.GlobalEventManager.OnCharacterDeath -= OnCharacterDeathInfusionHook;
-                }
-                else
-                {
-                    string langString = $"Increases health by <style=cIsHealing>{healthPerKill.Value} <style=cStack>(+{healthPerKill.Value} per stack)</style></style> per <style=cDeath>enemy death</style>";
-                    if (percentHealth.Value > 0)
-                        langString += $" up to <style=cUserSetting>{percentHealth.Value * 100}% <style=cStack>(+{percentHealth.Value * 100}% per stack)</style></style> of your base health.";
-                    else
-                        langString += ".";
-                    if (maxHealth.Value > 0)
-                        langString += $" Caps at <style=cUserSetting>{maxHealth.Value * 100}%</style> of your base health.";
-                    LanguageAPI.Add("ITEM_INFUSION_PICKUP", langString);
-                }
-            }
-        }
 
-        private void RecalculateStatsInfusionHook(ILContext il)
+            if (Patches.anyErrors)
+            {
+                HarmonyInstance.UnpatchSelf();
+                return;
+            }
+
+            string langString = $"Increases health by <style=cIsHealing>{healthPerKill.Value} <style=cStack>(+{healthPerKill.Value} per stack)</style></style> per <style=cDeath>enemy death</style>";
+            if (percentHealth.Value > 0)
+                langString += $" up to <style=cUserSetting>{percentHealth.Value * 100}% <style=cStack>(+{percentHealth.Value * 100}% per stack)</style></style> of your base health.";
+            else
+                langString += ".";
+            if (maxHealth.Value > 0)
+                langString += $" Caps at <style=cUserSetting>{maxHealth.Value * 100}%</style> of your base health.";
+            ModCommon.LanguageTokens.Add("ITEM_INFUSION_PICKUP", langString);
+        }
+    }
+
+
+    internal static class Patches
+    {
+        internal static bool anyErrors = false;
+
+        [HarmonyILManipulator]
+        [HarmonyPatch(typeof(CharacterBody), nameof(CharacterBody.RecalculateStats))]
+        internal static void RecalculateStatsInfusionHook(ILContext il)
         {
             ILCursor c = new ILCursor(il);
 
-            int infusionCountLoc = 0;
-            int infusionBonusLoc = 34;
-            int baseHealthLoc = 41;
+            int infusionCountLoc = 3;
+            int infusionBonusLoc = 40;
+            int baseHealthLoc = 50;
 
             bool found = false;
 
             found = c.TryGotoNext(MoveType.After,
-                x => x.MatchLdcI4((int)ItemIndex.Infusion),
-                x => x.MatchCallOrCallvirt(typeof(Inventory).GetMethod(nameof(Inventory.GetItemCount))),
+                x => x.MatchLdsfld(AccessTools.Field(typeof(RoR2Content.Items), nameof(RoR2Content.Items.Infusion))),
+                x => x.MatchCallOrCallvirt(AccessTools.Method(typeof(Inventory), nameof(Inventory.GetItemCount), parameters: new Type[] { typeof(ItemDef) })),
                 x => x.MatchStloc(out infusionCountLoc)
             );
             if (!found)
             {
-                Logger.LogError("Couldn't find where CharacterBody::RecalculateStats() checks infusion stack count, aborting ScalableInfusion hooks...");
+                ScalableInfusionPlugin.Logger.LogError("Couldn't find where CharacterBody::RecalculateStats() checks infusion stack count, aborting ScalableInfusion hooks...");
                 anyErrors = true;
                 return;
             }
 
             found = c.TryGotoNext(MoveType.After,
-                x => x.MatchCallOrCallvirt(typeof(Inventory).GetProperty(nameof(Inventory.infusionBonus)).GetGetMethod()),
+                x => x.MatchCallOrCallvirt(AccessTools.PropertyGetter(typeof(Inventory), nameof(Inventory.infusionBonus))),
                 x => x.MatchStloc(out infusionBonusLoc)
             );
             if (!found)
             {
-                Logger.LogError("Couldn't find where CharacterBody::RecalculateStats() checks infusion bonus, aborting ScalableInfusion hooks...");
+                ScalableInfusionPlugin.Logger.LogError("Couldn't find where CharacterBody::RecalculateStats() checks infusion bonus, aborting ScalableInfusion hooks...");
                 anyErrors = true;
                 return;
             }
@@ -112,7 +118,7 @@ namespace ScalableInfusion
             );
             if (!found)
             {
-                Logger.LogError("Couldn't find where the infusion bonus is applied in CharacterBody::RecalculateStats(), aborting ScalableInfusion hooks...");
+                ScalableInfusionPlugin.Logger.LogError("Couldn't find where the infusion bonus is applied in CharacterBody::RecalculateStats(), aborting ScalableInfusion hooks...");
                 anyErrors = true;
                 return;
             }
@@ -121,7 +127,7 @@ namespace ScalableInfusion
             c.Emit(OpCodes.Ldloc, baseHealthLoc);
             c.Emit(OpCodes.Dup);
             c.Emit(OpCodes.Ldarg_0);
-            c.EmitDelegate<Func<float, CharacterBody, float>>((baseHealth, cb) => 
+            c.EmitDelegate<Func<float, CharacterBody, float>>((baseHealth, cb) =>
             {
                 var tracker = cb.master.gameObject.GetComponent<InfusionTracker>();
                 if (!tracker)
@@ -139,35 +145,37 @@ namespace ScalableInfusion
             c.Emit(OpCodes.Stloc, baseHealthLoc);
         }
 
-        private void OnCharacterDeathInfusionHook(ILContext il)
+        [HarmonyILManipulator]
+        [HarmonyPatch(typeof(GlobalEventManager), nameof(GlobalEventManager.OnCharacterDeath))]
+        internal static void OnCharacterDeathInfusionHook(ILContext il)
         {
             ILCursor c = new ILCursor(il);
 
             int attackerBodyLoc = 13;
-            int infusionCountLoc = 33;
+            int infusionCountLoc = 36;
 
             bool found = false;
 
             found = c.TryGotoNext(MoveType.After,
                 x => x.MatchLdarg(1),
-                x => x.MatchLdfld(typeof(DamageReport).GetField("attackerBody")),
+                x => x.MatchLdfld(AccessTools.Field(typeof(DamageReport), nameof(DamageReport.attackerBody))),
                 x => x.MatchStloc(out attackerBodyLoc)
             );
             if (!found)
             {
-                Logger.LogError("Couldn't find where OnCharacterDeath gets attackerBody from the damageReport, aborting ScalableInfusion hooks...");
+                ScalableInfusionPlugin.Logger.LogError("Couldn't find where OnCharacterDeath gets attackerBody from the damageReport, aborting ScalableInfusion hooks...");
                 anyErrors = true;
                 return;
             }
 
             found = c.TryGotoNext(MoveType.After,
-                x => x.MatchLdcI4((int)ItemIndex.Infusion),
-                x => x.MatchCallOrCallvirt(typeof(Inventory).GetMethod(nameof(Inventory.GetItemCount))),
+                x => x.MatchLdsfld(AccessTools.Field(typeof(RoR2Content.Items), nameof(RoR2Content.Items.Infusion))),
+                x => x.MatchCallOrCallvirt(AccessTools.Method(typeof(Inventory), nameof(Inventory.GetItemCount), parameters: new Type[] { typeof(ItemDef) })),
                 x => x.MatchStloc(out infusionCountLoc)
             );
             if (!found)
             {
-                Logger.LogError("Couldn't find where OnCharacterDeath gets infusion count, aborting ScalableInfusion hooks...");
+                ScalableInfusionPlugin.Logger.LogError("Couldn't find where OnCharacterDeath gets infusion count, aborting ScalableInfusion hooks...");
                 anyErrors = true;
                 return;
             }
@@ -179,7 +187,7 @@ namespace ScalableInfusion
             );
             if (!found)
             {
-                Logger.LogError("Couldn't find where OnCharacterDeath checks infusion count, aborting ScalableInfusion hooks...");
+                ScalableInfusionPlugin.Logger.LogError("Couldn't find where OnCharacterDeath checks infusion count, aborting ScalableInfusion hooks...");
                 anyErrors = true;
                 return;
             }
@@ -203,7 +211,7 @@ namespace ScalableInfusion
             });
         }
     }
-    
+
     public class InfusionTracker : UnityEngine.MonoBehaviour
     {
         public List<int> Tracker = new List<int>();

@@ -17,44 +17,16 @@
       <HintPath>Libs\BepInEx.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="BepInEx.Harmony">
-      <HintPath>Libs\BepInEx.Harmony.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="BepInEx.Preloader">
-      <HintPath>Libs\BepInEx.Preloader.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="MMHOOK_Assembly-CSharp">
-      <HintPath>Libs\MMHOOK_Assembly-CSharp.dll</HintPath>
+    <Reference Include="ModCommon">
+      <HintPath>Libs\ModCommon.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Mono.Cecil">
       <HintPath>Libs\Mono.Cecil.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="Mono.Cecil.Mdb">
-      <HintPath>Libs\Mono.Cecil.Mdb.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Mono.Cecil.Pdb">
-      <HintPath>Libs\Mono.Cecil.Pdb.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Mono.Cecil.Rocks">
-      <HintPath>Libs\Mono.Cecil.Rocks.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="MonoMod.RuntimeDetour">
-      <HintPath>Libs\MonoMod.RuntimeDetour.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
     <Reference Include="MonoMod.Utils">
       <HintPath>Libs\MonoMod.Utils.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="R2API">
-      <HintPath>Libs\R2API.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine">

@@ -1,0 +1,10 @@
+{
+    "name": "ScalableInfusion",
+    "version_number": "1.1.0",
+    "website_url": "https://github.com/Windows10CE/ScalableInfusion",
+    "description": "Changes the infusion cap to be based on a percentage of your base health, instead of always 100 HP. (Configurable!)",
+    "dependencies": [
+        "bbepis-BepInExPack-5.4.9",
+        "Windows10CE-ModCommon-2.0.0"
+    ]
+}
